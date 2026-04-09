@@ -108,7 +108,7 @@ async def lifespan(app: FastAPI):
         await trigger_research_scan(agents["research"])
 
     scheduler.add_job(_snapshot_job, "interval", hours=1, id="portfolio_snapshot")
-    scheduler.add_job(_research_job, "interval", hours=1, minutes=5, id="research_scan")
+    scheduler.add_job(_research_job, "interval", minutes=20, id="research_scan")
     scheduler.start()
     app.state.scheduler = scheduler
     logger.info("Scheduler started")

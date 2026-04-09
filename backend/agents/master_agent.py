@@ -258,9 +258,14 @@ Be brief (3-5 bullet points).""",
         return None
 
     async def trigger_research_scan(self) -> None:
-        """Called by scheduler to kick off a new research cycle."""
-        from agents.research_agent import ResearchAgent
-        # Direct call to research agent's scan method
-        # (we get the instance from the app state)
+        """Trigger a research scan via the bus (scheduler, user prompt, or post-cycle)."""
+        import uuid
         logger.info("Master triggering research scan")
         await self.update_status("thinking", "Triggering research scan...")
+        # Publish a special internal message that research agent listens for
+        await self.publish(
+            to_agent="research",
+            message_type=MessageType.STATUS_UPDATE,
+            payload={"action": "scan", "round_id": str(uuid.uuid4())},
+        )
+        await self.update_status("idle", "Research scan triggered")

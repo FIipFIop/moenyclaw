@@ -42,15 +42,41 @@ class ResearchAgent(BaseAgent):
         self._hyperliquid = None
 
     async def startup(self) -> None:
+        import asyncio
         from integrations.hyperliquid import hyperliquid_client
         from integrations.polymarket import polymarket_client
         self._polymarket = polymarket_client
         self._hyperliquid = hyperliquid_client
-        await self.update_status("idle", "Research agent ready — awaiting scan trigger")
+        await self.update_status("idle", "Research agent ready — starting initial scan...")
+        # Kick off first scan after a short delay so all agents finish startup first
+        asyncio.create_task(self._delayed_initial_scan())
+
+    async def _delayed_initial_scan(self) -> None:
+        import asyncio, uuid
+        await asyncio.sleep(5)  # wait for all agents to be ready
+        await self.scan(round_id=str(uuid.uuid4()))
+
+    async def _delayed_rescan(self) -> None:
+        """Wait before rescanning so agents have time to settle after a cycle."""
+        import asyncio, uuid
+        await asyncio.sleep(120)  # 2 min cooldown between cycles
+        logger.info("Research agent: auto-rescanning after completed cycle")
+        await self.scan(round_id=str(uuid.uuid4()))
 
     async def handle_message(self, msg: AgentMessage) -> None:
-        # Research agent doesn't react to other agents except master triggers
-        pass
+        # Master sends STATUS_UPDATE with action=scan to trigger a scan
+        if (
+            msg.message_type == MessageType.STATUS_UPDATE
+            and msg.to_agent == "research"
+            and msg.payload.get("action") == "scan"
+        ):
+            import asyncio
+            asyncio.create_task(self.scan(round_id=msg.payload.get("round_id")))
+
+        # After every completed execution, wait a bit then rescan
+        elif msg.message_type == MessageType.EXECUTION_REPORT and not msg.payload.get("failed"):
+            import asyncio
+            asyncio.create_task(self._delayed_rescan())
 
     async def scan(self, round_id: str | None = None) -> None:
         """Main scan loop — called by scheduler or master agent."""
