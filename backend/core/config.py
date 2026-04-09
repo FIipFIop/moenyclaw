@@ -21,14 +21,14 @@ class Settings(BaseSettings):
     hyperliquid_address: str = ""
     hyperliquid_network: str = "mainnet"
 
-    # Telegram
+    # Telegram (all optional — bot simply won't start without a token)
     telegram_bot_token: str = ""
     telegram_allowed_user_id: int = 0
-    telegram_vercel_url: str = "http://localhost:3000"
 
     # App
     database_url: str = "sqlite+aiosqlite:///./moneyclaw.sqlite"
     backend_url: str = "http://localhost:8000"
+    dashboard_url: str = "http://localhost:3000"  # local network URL for /web command
     secret_key: str = ""
     trading_enabled: bool = False
     log_level: str = "INFO"

@@ -74,17 +74,20 @@ async def lifespan(app: FastAPI):
     # 5. Start message bus dispatcher
     bus_task = asyncio.create_task(bus.run())
 
-    # 6. Telegram bot
+    # 6. Telegram bot (optional — skipped if no token)
     telegram_task = None
+    tg_bot = None
     if settings.telegram_bot_token:
-        from integrations.telegram_bot import TelegramBot
-        tg_bot = TelegramBot(agents=agents)
-        app.state.telegram_bot = tg_bot
-        telegram_task = asyncio.create_task(tg_bot.run())
-        logger.info("Telegram bot started")
+        try:
+            from integrations.telegram_bot import TelegramBot
+            tg_bot = TelegramBot(agents=agents)
+            telegram_task = asyncio.create_task(tg_bot.run())
+            logger.info("Telegram bot started")
+        except Exception as e:
+            logger.warning("Telegram bot failed to start: %s", e)
     else:
-        logger.warning("No TELEGRAM_BOT_TOKEN — bot disabled")
-        app.state.telegram_bot = None
+        logger.info("TELEGRAM_BOT_TOKEN not set — Telegram bot disabled")
+    app.state.telegram_bot = tg_bot
 
     # 7. APScheduler
     from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -108,9 +111,9 @@ async def lifespan(app: FastAPI):
     scheduler.add_job(_research_job, "interval", hours=1, minutes=5, id="research_scan")
     scheduler.start()
     app.state.scheduler = scheduler
-    logger.info("Scheduler started (portfolio snapshot + research scan every hour)")
+    logger.info("Scheduler started")
 
-    # Take initial portfolio snapshot
+    # Take initial portfolio snapshot (non-blocking)
     asyncio.create_task(_snapshot_job())
 
     logger.info("=== MoneyClaw ready ===")
@@ -165,7 +168,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Tighten in production: set to your Vercel URL
+    allow_origins=["*"],  # local network — all origins allowed
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

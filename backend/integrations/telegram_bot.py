@@ -150,7 +150,7 @@ class TelegramBot:
                 session.add(DashboardToken(token=token, expires_at=expires_at))
                 await session.commit()
 
-            url = f"{settings.telegram_vercel_url}/access/{token}"
+            url = f"{settings.dashboard_url}/access/{token}"
             msg = (
                 f"*🔐 Dashboard Access Link*\n\n"
                 f"[Open Dashboard]({url})\n\n"

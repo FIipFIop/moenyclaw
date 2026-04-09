@@ -1,6 +1,6 @@
 # 🐾 MoneyClaw — Financial AI Agent Network
 
-A multi-agent AI system for crypto trading on Polymarket and Hyperliquid. Agents debate trade ideas, challenge each other, and execute when they reach consensus. Controlled via Telegram. Dashboard via Vercel.
+A multi-agent AI system for crypto trading on Polymarket and Hyperliquid. Agents debate trade ideas, challenge each other, and execute when they reach consensus. Controlled via Telegram. Dashboard runs locally on your network — no cloud required.
 
 ## Architecture
 
@@ -22,7 +22,7 @@ git clone https://github.com/FIipFIop/moenyclaw.git
 cd moenyclaw
 
 cp .env.example backend/.env
-# Fill in all values in backend/.env
+# Only OPENROUTER_API_KEY is needed to start — all others are optional
 ```
 
 ### 2. Backend
@@ -47,25 +47,24 @@ npm run dev  # http://localhost:3000
 
 ### 4. Get dashboard access
 
-Send `/web` to your Telegram bot → click the link (valid 1 hour).
+Open `http://localhost:3000` directly — or if Telegram is set up, send `/web` to get a time-limited link.
 
 ---
 
 ## Environment Variables
 
-Copy `.env.example` to `backend/.env` and fill in:
+Copy `.env.example` to `backend/.env`. **All keys except `OPENROUTER_API_KEY` are optional** — the system runs in demo/paper mode without them.
 
-| Variable | Description |
-|---|---|
-| `OPENROUTER_API_KEY` | Get at openrouter.ai |
-| `POLYMARKET_API_KEY` | Polymarket CLOB API key |
-| `POLYMARKET_PRIVATE_KEY` | Wallet private key (Polygon) |
-| `HYPERLIQUID_PRIVATE_KEY` | Hyperliquid account key |
-| `HYPERLIQUID_ADDRESS` | Your HL wallet address |
-| `TELEGRAM_BOT_TOKEN` | From @BotFather |
-| `TELEGRAM_ALLOWED_USER_ID` | Your Telegram user ID (from @userinfobot) |
-| `TELEGRAM_VERCEL_URL` | Your Vercel frontend URL |
-| `TRADING_ENABLED` | `false` = paper mode, `true` = live |
+| Variable | Required | Description |
+|---|---|---|
+| `OPENROUTER_API_KEY` | Recommended | Free at openrouter.ai — agents reason without real keys |
+| `POLYMARKET_PRIVATE_KEY` | Optional | Needed for real Polymarket trading |
+| `HYPERLIQUID_PRIVATE_KEY` | Optional | Needed for real Hyperliquid trading |
+| `HYPERLIQUID_ADDRESS` | Optional | Your HL wallet address |
+| `TELEGRAM_BOT_TOKEN` | Optional | From @BotFather — system works fine without it |
+| `TELEGRAM_ALLOWED_USER_ID` | Optional | Your Telegram user ID (from @userinfobot) |
+| `DASHBOARD_URL` | Optional | Your local network address e.g. `http://192.168.1.10:3000` |
+| `TRADING_ENABLED` | No | `false` = paper mode (default), `true` = live execution |
 
 ---
 
@@ -82,23 +81,16 @@ Copy `.env.example` to `backend/.env` and fill in:
 
 ---
 
-## Deploying to Vercel
+## Accessing from other devices on your network
 
-The **frontend** (Next.js) deploys to Vercel. The **backend** needs a persistent server (VPS, Fly.io, Railway).
+To reach the dashboard from your phone or another PC on the same WiFi:
 
-```bash
-# Install Vercel CLI
-npm i -g vercel
+1. Find your machine's local IP: `ipconfig getifaddr en0` (Mac) or `hostname -I` (Linux)
+2. Set in `backend/.env`: `DASHBOARD_URL=http://192.168.1.X:3000`
+3. Run the frontend bound to all interfaces: `npm run dev -- -H 0.0.0.0`
+4. Access from any device: `http://192.168.1.X:3000`
 
-cd frontend
-vercel --prod
-```
-
-Set in Vercel environment variables:
-```
-NEXT_PUBLIC_BACKEND_API_URL=https://your-backend.fly.dev
-NEXT_PUBLIC_BACKEND_WS_URL=wss://your-backend.fly.dev/ws
-```
+The `/web` Telegram command will generate a link using `DASHBOARD_URL`, so the link works from your phone.
 
 ---
 

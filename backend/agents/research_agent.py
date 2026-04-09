@@ -82,29 +82,40 @@ class ResearchAgent(BaseAgent):
             await self.update_status("error", f"Scan error: {str(e)[:100]}")
 
     async def _gather_market_data(self) -> dict:
-        """Gather data from exchanges."""
-        data = {}
-        try:
-            if self._polymarket:
-                markets = await self._polymarket.get_active_markets(limit=20)
-                data["polymarket_markets"] = markets
-        except Exception as e:
-            logger.warning("Polymarket data fetch failed: %s", e)
-            data["polymarket_markets"] = []
+        """Gather data from exchanges. Gracefully returns empty lists if not configured."""
+        data: dict = {"polymarket_markets": [], "hyperliquid_markets": [], "demo_mode": False}
 
-        try:
-            if self._hyperliquid:
-                meta = await self._hyperliquid.get_market_summary()
-                data["hyperliquid_markets"] = meta
-        except Exception as e:
-            logger.warning("Hyperliquid data fetch failed: %s", e)
-            data["hyperliquid_markets"] = []
+        # Polymarket
+        if self._polymarket and settings.polymarket_private_key:
+            try:
+                data["polymarket_markets"] = await self._polymarket.get_active_markets(limit=20)
+            except Exception as e:
+                logger.warning("Polymarket data fetch failed: %s", e)
+        else:
+            logger.info("Polymarket not configured — skipping live data")
+
+        # Hyperliquid
+        if self._hyperliquid and settings.hyperliquid_private_key:
+            try:
+                data["hyperliquid_markets"] = await self._hyperliquid.get_market_summary()
+            except Exception as e:
+                logger.warning("Hyperliquid data fetch failed: %s", e)
+        else:
+            logger.info("Hyperliquid not configured — skipping live data")
+
+        # If neither exchange is configured, use demo/simulated data so agents still run
+        if not data["polymarket_markets"] and not data["hyperliquid_markets"]:
+            data["demo_mode"] = True
+            data["hyperliquid_markets"] = _DEMO_MARKETS
 
         return data
 
     async def _analyze_with_llm(self, market_data: dict) -> list[dict]:
         """Use LLM to identify opportunities from raw market data."""
-        user_prompt = f"""Analyze the following market data and identify trading opportunities:
+        demo = market_data.get("demo_mode", False)
+        note = "\n⚠️ NOTE: No exchange keys configured — using simulated demo data. Set up API keys for real trading.\n" if demo else ""
+
+        user_prompt = f"""Analyze the following market data and identify trading opportunities:{note}
 
 POLYMARKET (prediction markets):
 {json.dumps(market_data.get('polymarket_markets', [])[:10], indent=2, default=str)}
@@ -114,6 +125,10 @@ HYPERLIQUID (perpetuals — top movers/volume):
 
 Identify up to 3 high-confidence opportunities. Output a JSON array."""
 
+        if not settings.openrouter_api_key:
+            logger.info("No OPENROUTER_API_KEY — skipping LLM analysis, returning demo opportunity")
+            return [_DEMO_OPPORTUNITY] if market_data.get("demo_mode") else []
+
         try:
             response = await self.call_llm(
                 system=SYSTEM_PROMPT,
@@ -121,9 +136,7 @@ Identify up to 3 high-confidence opportunities. Output a JSON array."""
                 temperature=0.3,
                 max_tokens=1500,
             )
-            # Extract JSON from response
             text = response.strip()
-            # Find JSON array in response
             start = text.find("[")
             end = text.rfind("]") + 1
             if start >= 0 and end > start:
@@ -132,3 +145,24 @@ Identify up to 3 high-confidence opportunities. Output a JSON array."""
             logger.error("LLM analysis failed: %s", e)
 
         return []
+
+
+# ── Demo/fallback data when no exchange keys are configured ────────────────
+
+_DEMO_MARKETS = [
+    {"name": "BTC", "mark_price": 65000.0, "funding": 0.0001, "open_interest": 500000000.0, "day_change_pct": 2.3},
+    {"name": "ETH", "mark_price": 3200.0, "funding": 0.00008, "open_interest": 200000000.0, "day_change_pct": 1.8},
+    {"name": "SOL", "mark_price": 145.0, "funding": 0.00015, "open_interest": 80000000.0, "day_change_pct": -0.5},
+]
+
+_DEMO_OPPORTUNITY = {
+    "exchange": "hyperliquid",
+    "market": "BTC",
+    "direction": "long",
+    "current_price": 65000.0,
+    "target_price": 68000.0,
+    "confidence": 0.62,
+    "rationale": "DEMO MODE — No real API keys configured. This is a simulated opportunity for testing.",
+    "time_horizon": "1d",
+    "market_id": "demo",
+}

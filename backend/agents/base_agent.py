@@ -62,6 +62,9 @@ class BaseAgent(ABC):
         temperature: float = 0.7,
         max_tokens: int = 2048,
     ) -> str:
+        if not settings.openrouter_api_key:
+            logger.warning("%s: No OPENROUTER_API_KEY — LLM call skipped", self.name)
+            return '{"error": "no_api_key", "message": "Set OPENROUTER_API_KEY to enable AI reasoning"}'
         messages = [
             {"role": "system", "content": system},
             {"role": "user", "content": user},
