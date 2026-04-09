@@ -37,12 +37,12 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     # OpenRouter model assignments
-    model_master: str = "nvidia/llama-3.1-nemotron-ultra-253b-v1:free"
+    model_master: str = "openai/gpt-oss-120b:free"
     model_research: str = "minimax/minimax-m2.5:free"
-    model_analysis: str = "google/gemma-4-31b:free"
-    model_risk: str = "nvidia/llama-3.1-nemotron-ultra-253b-v1:free"
-    model_debate: str = "google/gemma-4-26b-a4b:free"
-    model_execution: str = "google/gemma-4-26b-a4b:free"
+    model_analysis: str = "google/gemma-4-31b-it:free"
+    model_risk: str = "openai/gpt-oss-120b:free"
+    model_debate: str = "google/gemma-4-26b-a4b-it:free"
+    model_execution: str = "google/gemma-4-26b-a4b-it:free"
 
     @field_validator("telegram_allowed_user_id", mode="before")
     @classmethod

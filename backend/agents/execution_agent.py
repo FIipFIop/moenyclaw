@@ -31,7 +31,7 @@ class ExecutionAgent(BaseAgent):
         from integrations.polymarket import polymarket_client
         self._polymarket = polymarket_client
         self._hyperliquid = hyperliquid_client
-        await self.update_status("idle", "Execution agent ready (dry-run mode)" if not settings.trading_enabled else "Execution agent ready (LIVE)")
+        await self.update_status("idle", "Execution agent ready (paper mode)" if not settings.trading_enabled else "Execution agent ready (LIVE)")
 
     async def handle_message(self, msg: AgentMessage) -> None:
         if msg.message_type == MessageType.MASTER_DECISION:
@@ -54,21 +54,25 @@ class ExecutionAgent(BaseAgent):
         result = {}
 
         try:
-            if not settings.trading_enabled:
-                # Dry-run mode
+            exchange_enabled = await self._exchange_enabled(exchange)
+            live = settings.trading_enabled and exchange_enabled
+
+            if not live:
+                reason = "trading_enabled=false" if not settings.trading_enabled else f"{exchange} disabled"
+                real_price = await self._fetch_current_price(exchange, thesis)
                 result = {
-                    "status": "dry_run",
+                    "status": "paper",
                     "trade_id": trade_id,
                     "market": market,
                     "exchange": exchange,
                     "direction": thesis.get("direction"),
                     "size_pct": review.get("approved_size_pct", 1.0),
-                    "entry_price": thesis.get("suggested_entry"),
+                    "entry_price": real_price or thesis.get("suggested_entry"),
                     "stop_loss": review.get("stop_loss"),
                     "take_profit": review.get("take_profit"),
-                    "message": "DRY RUN — trading_enabled=false. No real order placed.",
+                    "message": f"PAPER TRADE — {reason}. Real price: {real_price}",
                 }
-                logger.info("DRY RUN: Would have executed %s", json.dumps(result))
+                logger.info("PAPER TRADE (%s): %s", reason, json.dumps(result))
             else:
                 # Live execution
                 if exchange == "hyperliquid":
@@ -88,7 +92,7 @@ class ExecutionAgent(BaseAgent):
                 round_id=msg.round_id,
             )
 
-            status = "dry_run" if not settings.trading_enabled else result.get("status", "unknown")
+            status = result.get("status", "unknown")
             await self.update_status("idle", f"Execution complete: {market} → {status}")
 
         except Exception as e:
@@ -110,6 +114,34 @@ class ExecutionAgent(BaseAgent):
                 round_id=msg.round_id,
             )
             await self.update_status("error", f"Execution failed: {str(e)[:100]}")
+
+    async def _exchange_enabled(self, exchange: str) -> bool:
+        """Check per-exchange toggle from system_config DB."""
+        from sqlalchemy import select
+        from models.portfolio import SystemConfig
+        key = f"{exchange}_enabled"
+        try:
+            async with AsyncSessionLocal() as session:
+                result = await session.execute(select(SystemConfig).where(SystemConfig.key == key))
+                row = result.scalar_one_or_none()
+                return row.value == "true" if row else True  # default: enabled
+        except Exception:
+            return True
+
+    async def _fetch_current_price(self, exchange: str, thesis: dict) -> float | None:
+        """Fetch real current price for paper trade entry."""
+        try:
+            market = thesis.get("market", "")
+            if exchange == "hyperliquid" and self._hyperliquid:
+                info = await self._hyperliquid.get_market_info(market)
+                return info.get("mid_price") or info.get("mark_price")
+            elif exchange == "polymarket" and self._polymarket:
+                market_id = thesis.get("market_id", "")
+                prices = await self._polymarket.get_market_prices(market_id)
+                return prices.get("yes_price") or prices.get("best_bid")
+        except Exception as e:
+            logger.warning("Could not fetch real price for paper trade: %s", e)
+        return thesis.get("suggested_entry")
 
     async def _execute_hyperliquid(self, thesis: dict, review: dict) -> dict:
         direction = thesis.get("direction", "")

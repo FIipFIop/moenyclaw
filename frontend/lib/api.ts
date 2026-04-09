@@ -15,8 +15,10 @@ export const api = {
   trades: (params?: string) => apiFetch<Trade[]>(`/api/trades${params ? "?" + params : ""}`),
   portfolioCurrent: () => apiFetch<Portfolio>("/api/portfolio/current"),
   portfolioHistory: (days = 7) => apiFetch<PortfolioPoint[]>(`/api/portfolio/history?days=${days}`),
-  systemConfig: () => apiFetch<{ trading_enabled: boolean }>("/api/system/config"),
+  systemConfig: () => apiFetch<{ trading_enabled: boolean; polymarket_enabled: boolean; hyperliquid_enabled: boolean }>("/api/system/config"),
   toggleTrading: () => apiFetch<{ trading_enabled: boolean }>("/api/system/toggle-trading", { method: "POST" }),
+  togglePolymarket: () => apiFetch<{ polymarket_enabled: boolean }>("/api/system/toggle-polymarket", { method: "POST" }),
+  toggleHyperliquid: () => apiFetch<{ hyperliquid_enabled: boolean }>("/api/system/toggle-hyperliquid", { method: "POST" }),
   validateToken: (token: string) => apiFetch<{ valid: boolean; expires_at: string }>(`/api/tokens/${token}/validate`),
 };
 

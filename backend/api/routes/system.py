@@ -30,7 +30,13 @@ async def _set_config(key: str, value: str, db: AsyncSession) -> None:
 @router.get("/config")
 async def get_system_config(db: AsyncSession = Depends(get_db)):
     trading = await _get_config("trading_enabled", db, "false")
-    return {"trading_enabled": trading == "true"}
+    poly = await _get_config("polymarket_enabled", db, "true")
+    hl = await _get_config("hyperliquid_enabled", db, "true")
+    return {
+        "trading_enabled": trading == "true",
+        "polymarket_enabled": poly == "true",
+        "hyperliquid_enabled": hl == "true",
+    }
 
 
 @router.post("/toggle-trading")
@@ -38,9 +44,37 @@ async def toggle_trading(db: AsyncSession = Depends(get_db)):
     current = await _get_config("trading_enabled", db, "false")
     new_val = "false" if current == "true" else "true"
     await _set_config("trading_enabled", new_val, db)
-
-    # Broadcast to WS clients
     from core.websocket_manager import ws_manager
-    await ws_manager.broadcast({"event": "trading_toggled", "data": {"trading_enabled": new_val == "true"}})
-
+    await ws_manager.broadcast({"event": "config_changed", "data": await _full_config(db)})
     return {"trading_enabled": new_val == "true"}
+
+
+@router.post("/toggle-polymarket")
+async def toggle_polymarket(db: AsyncSession = Depends(get_db)):
+    current = await _get_config("polymarket_enabled", db, "true")
+    new_val = "false" if current == "true" else "true"
+    await _set_config("polymarket_enabled", new_val, db)
+    from core.websocket_manager import ws_manager
+    await ws_manager.broadcast({"event": "config_changed", "data": await _full_config(db)})
+    return {"polymarket_enabled": new_val == "true"}
+
+
+@router.post("/toggle-hyperliquid")
+async def toggle_hyperliquid(db: AsyncSession = Depends(get_db)):
+    current = await _get_config("hyperliquid_enabled", db, "true")
+    new_val = "false" if current == "true" else "true"
+    await _set_config("hyperliquid_enabled", new_val, db)
+    from core.websocket_manager import ws_manager
+    await ws_manager.broadcast({"event": "config_changed", "data": await _full_config(db)})
+    return {"hyperliquid_enabled": new_val == "true"}
+
+
+async def _full_config(db: AsyncSession) -> dict:
+    trading = await _get_config("trading_enabled", db, "false")
+    poly = await _get_config("polymarket_enabled", db, "true")
+    hl = await _get_config("hyperliquid_enabled", db, "true")
+    return {
+        "trading_enabled": trading == "true",
+        "polymarket_enabled": poly == "true",
+        "hyperliquid_enabled": hl == "true",
+    }
