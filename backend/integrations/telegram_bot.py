@@ -22,7 +22,8 @@ def _auth(func):
     async def wrapper(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not update.effective_user:
             return
-        if update.effective_user.id != settings.telegram_allowed_user_id:
+        allowed = settings.telegram_allowed_user_id
+        if allowed is not None and update.effective_user.id != allowed:
             await update.message.reply_text("Unauthorized.")
             return
         return await func(self, update, context)
