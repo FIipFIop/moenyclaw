@@ -53,6 +53,7 @@ class MessageType:
     SELF_CORRECTION = "SELF_CORRECTION"
     STATUS_UPDATE = "STATUS_UPDATE"
     HOURLY_REPORT = "HOURLY_REPORT"
+    USER_PROMPT = "USER_PROMPT"
 
 
 HandlerFn = Callable[[AgentMessage], Coroutine[Any, Any, None]]

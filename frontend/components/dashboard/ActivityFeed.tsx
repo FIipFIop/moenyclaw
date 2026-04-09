@@ -22,6 +22,7 @@ function FeedItem({ msg }: { msg: FeedMsg }) {
       const thesis = p?.thesis;
       const result = p?.result;
       const decision = p?.decision;
+      if (p?.text) return p.text.slice(0, 120);  // USER_PROMPT and STATUS_UPDATE replies
       if (opp?.market) return `${opp.direction?.toUpperCase()} ${opp.market} (${opp.exchange}) — conf: ${opp.confidence}`;
       if (thesis?.market) return `${thesis.market}: conf ${thesis.confidence_score} | entry ${thesis.suggested_entry}`;
       if (decision?.action) return `Decision: ${decision.action.toUpperCase()} — ${decision.reason?.slice(0, 80)}`;

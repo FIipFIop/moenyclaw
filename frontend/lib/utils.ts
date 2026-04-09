@@ -32,6 +32,7 @@ export function msgTypeColor(type: string): string {
     SELF_CORRECTION: "text-red-400",
     STATUS_UPDATE: "text-slate-400",
     HOURLY_REPORT: "text-slate-400",
+    USER_PROMPT: "text-pink-400",
   };
   return map[type] || "text-slate-400";
 }
@@ -44,6 +45,7 @@ export function agentColor(name: string): string {
     risk: "bg-orange-500",
     debate: "bg-purple-500",
     execution: "bg-cyan-500",
+    user: "bg-pink-500",
   };
   return map[name] || "bg-slate-500";
 }

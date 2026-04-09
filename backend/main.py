@@ -175,13 +175,14 @@ app.add_middleware(
 )
 
 # ── Routes ──────────────────────────────────────────────────────────────────
-from api.routes import agents, portfolio, system, tokens, trades, ws
+from api.routes import agents, portfolio, prompt, system, tokens, trades, ws
 
 app.include_router(agents.router)
 app.include_router(trades.router)
 app.include_router(portfolio.router)
 app.include_router(tokens.router)
 app.include_router(system.router)
+app.include_router(prompt.router)
 app.include_router(ws.router)
 
 
