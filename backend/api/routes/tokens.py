@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,6 +11,20 @@ from models.token import DashboardToken
 router = APIRouter(prefix="/api/tokens", tags=["tokens"])
 
 TOKEN_TTL_HOURS = 1
+LOCAL_IPS = {"127.0.0.1", "::1", "localhost"}
+
+
+@router.get("/local")
+async def local_token(request: Request, db: AsyncSession = Depends(get_db)):
+    """Auto-generate a token for localhost access — no Telegram needed."""
+    client_ip = request.client.host if request.client else ""
+    if client_ip not in LOCAL_IPS:
+        raise HTTPException(status_code=403, detail="Only accessible from localhost")
+    token = str(uuid.uuid4())
+    expires_at = datetime.utcnow() + timedelta(hours=TOKEN_TTL_HOURS)
+    db.add(DashboardToken(token=token, expires_at=expires_at))
+    await db.commit()
+    return {"token": token, "expires_at": expires_at}
 
 
 @router.post("")

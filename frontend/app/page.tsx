@@ -1,6 +1,12 @@
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 
 export default function Home() {
-  // Root always redirects — dashboard requires token-validated cookie
-  redirect("/dashboard");
+  // If already has a session, go straight to dashboard
+  const session = cookies().get("mc_session");
+  if (session?.value) {
+    redirect("/dashboard");
+  }
+  // Otherwise auto-login via local token (works on localhost)
+  redirect("/local");
 }
