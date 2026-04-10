@@ -59,20 +59,24 @@ class ExecutionAgent(BaseAgent):
 
             if not live:
                 reason = "trading_enabled=false" if not settings.trading_enabled else f"{exchange} disabled"
-                real_price = await self._fetch_current_price(exchange, thesis)
-                result = {
-                    "status": "paper",
-                    "trade_id": trade_id,
-                    "market": market,
-                    "exchange": exchange,
-                    "direction": thesis.get("direction"),
-                    "size_pct": review.get("approved_size_pct", 1.0),
-                    "entry_price": real_price or thesis.get("suggested_entry"),
-                    "stop_loss": review.get("stop_loss"),
-                    "take_profit": review.get("take_profit"),
-                    "message": f"PAPER TRADE — {reason}. Real price: {real_price}",
-                }
-                logger.info("PAPER TRADE (%s): %s", reason, json.dumps(result))
+                if exchange == "polymarket":
+                    # Real order book paper execution via polymarket-paper-trader
+                    result = await self._paper_execute_polymarket(thesis, review, reason)
+                else:
+                    real_price = await self._fetch_current_price(exchange, thesis)
+                    result = {
+                        "status": "paper",
+                        "trade_id": trade_id,
+                        "market": market,
+                        "exchange": exchange,
+                        "direction": thesis.get("direction"),
+                        "size_pct": review.get("approved_size_pct", 1.0),
+                        "entry_price": real_price or thesis.get("suggested_entry"),
+                        "stop_loss": review.get("stop_loss"),
+                        "take_profit": review.get("take_profit"),
+                        "message": f"PAPER TRADE — {reason}. Real price: {real_price}",
+                    }
+                    logger.info("PAPER TRADE (%s): %s", reason, json.dumps(result))
             else:
                 # Live execution
                 if exchange == "hyperliquid":
@@ -142,6 +146,59 @@ class ExecutionAgent(BaseAgent):
         except Exception as e:
             logger.warning("Could not fetch real price for paper trade: %s", e)
         return thesis.get("suggested_entry")
+
+    async def _paper_execute_polymarket(self, thesis: dict, review: dict, reason: str) -> dict:
+        """Execute a Polymarket paper trade using real order book via polymarket-paper-trader."""
+        import asyncio
+        from integrations.paper_polymarket import get_engine
+
+        direction = thesis.get("direction", "")
+        market_id = thesis.get("market_id") or thesis.get("market", "")
+        outcome = "yes" if ("buy" in direction.lower() or "yes" in direction.lower()) else "no"
+
+        # Determine size in USD from approved_size_pct of paper balance
+        engine = get_engine()
+        bal = engine.get_balance()
+        paper_balance = bal.get("cash", 10_000.0)
+        size_pct = review.get("approved_size_pct", 1.0)
+        amount_usd = round(paper_balance * (size_pct / 100.0), 2)
+        amount_usd = max(amount_usd, 5.0)  # minimum $5 trade
+
+        try:
+            trade_result = await asyncio.get_event_loop().run_in_executor(
+                None, lambda: engine.buy(market_id, outcome, amount_usd)
+            )
+            t = trade_result.trade
+            result = {
+                "status": "paper",
+                "trade_id": str(t.id),
+                "market": t.market_slug,
+                "market_question": t.market_question,
+                "exchange": "polymarket",
+                "direction": f"{t.side} {t.outcome}",
+                "amount_usd": t.amount_usd,
+                "shares": t.shares,
+                "entry_price": t.avg_price,
+                "slippage_bps": round(t.slippage, 1),
+                "levels_filled": t.levels_filled,
+                "fee": t.fee,
+                "paper_cash_remaining": trade_result.account.cash,
+                "message": f"PAPER TRADE via real order book — {reason}. Slippage: {t.slippage:.0f}bps",
+            }
+            logger.info(
+                "PAPER polymarket: %s %s %s @ %.4f, slippage=%.0fbps",
+                t.side, t.outcome, t.market_slug, t.avg_price, t.slippage,
+            )
+        except Exception as e:
+            logger.error("Paper Polymarket execution failed: %s", e)
+            result = {
+                "status": "paper_failed",
+                "exchange": "polymarket",
+                "market": market_id,
+                "error": str(e),
+                "message": f"Paper trade failed: {e}",
+            }
+        return result
 
     async def _execute_hyperliquid(self, thesis: dict, review: dict) -> dict:
         direction = thesis.get("direction", "")

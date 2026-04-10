@@ -5,6 +5,7 @@ import { AgentCard } from "@/components/dashboard/AgentCard";
 import { ActivityFeed } from "@/components/dashboard/ActivityFeed";
 import { BalanceChart } from "@/components/dashboard/BalanceChart";
 import { TradeTable } from "@/components/dashboard/TradeTable";
+import { PaperPortfolio } from "@/components/dashboard/PaperPortfolio";
 
 export default function DashboardPage() {
   const { data: agents = [], isLoading } = useQuery({
@@ -59,6 +60,9 @@ export default function DashboardPage() {
         <BalanceChart />
         <ActivityFeed />
       </div>
+
+      {/* Paper portfolio */}
+      <PaperPortfolio />
 
       {/* Recent trades */}
       <div>
