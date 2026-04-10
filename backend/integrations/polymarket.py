@@ -54,8 +54,8 @@ class PolymarketClient:
             logger.warning("Polymarket CLOB init failed (no API key?): %s", e)
             self._ready = False
 
-    async def get_active_markets(self, limit: int = 20) -> list[dict]:
-        """Fetch active markets with high volume from Gamma API."""
+    async def get_active_markets(self, limit: int = 30) -> list[dict]:
+        """Fetch active markets sorted by 24h volume. Includes end_date for time-to-resolve filtering."""
         try:
             client = await self._get_http_client()
             resp = await client.get(
@@ -73,16 +73,21 @@ class PolymarketClient:
 
             markets = []
             for m in data:
+                try:
+                    prices = [float(p) for p in (m.get("outcomePrices") or [])]
+                except Exception:
+                    prices = []
                 markets.append({
-                    "id": m.get("id"),
+                    "condition_id": m.get("conditionId"),
                     "question": m.get("question"),
                     "end_date": m.get("endDate"),
-                    "volume": m.get("volume"),
-                    "volume_24hr": m.get("volume24hr"),
-                    "liquidity": m.get("liquidity"),
+                    "volume_24hr": round(float(m.get("volume24hr") or 0), 0),
+                    "volume_total": round(float(m.get("volume") or 0), 0),
+                    "liquidity": round(float(m.get("liquidity") or 0), 0),
                     "outcomes": m.get("outcomes", []),
-                    "outcome_prices": m.get("outcomePrices", []),
-                    "condition_id": m.get("conditionId"),
+                    "outcome_prices": prices,  # [yes_price, no_price]
+                    "yes_price": prices[0] if prices else None,
+                    "no_price": prices[1] if len(prices) > 1 else None,
                 })
             return markets
 

@@ -13,23 +13,32 @@ from core.message_bus import AgentMessage, MessageBus, MessageType
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = """You are a crypto market research agent. Your job is to identify high-probability trading opportunities on Polymarket (prediction markets) and Hyperliquid (perpetuals).
+SYSTEM_PROMPT = """You are a Polymarket short-term trading specialist. Your only goal is fast profit: find markets that are MISPRICED RIGHT NOW and will resolve or correct within hours to a few days.
 
-For each opportunity you identify, output a JSON object with:
+WHAT TO LOOK FOR (quick flips only):
+- Markets resolving within 24-72 hours where current price is clearly wrong
+- Sports games, political votes, economic releases happening TODAY or TOMORROW
+- Markets at extreme prices (< 0.15 or > 0.85) that are obviously too low/high
+- High-volume markets where the crowd is wrong
+
+IGNORE: anything resolving more than 1 week away. Ignore low-volume markets under $5k.
+
+For each opportunity output a JSON object:
 {
-  "exchange": "polymarket" or "hyperliquid",
-  "market": "<market name or token>",
-  "direction": "buy/long or sell/short",
-  "current_price": <float>,
-  "target_price": <float>,
+  "exchange": "polymarket",
+  "market": "<short market name>",
+  "market_id": "<condition_id from data>",
+  "direction": "buy yes" or "buy no",
+  "current_price": <float 0-1>,
+  "fair_value": <your estimate 0-1>,
+  "edge": <fair_value - current_price, positive means underpriced>,
   "confidence": <0.0 to 1.0>,
-  "rationale": "<brief explanation>",
-  "time_horizon": "<e.g. 4h, 1d, 1w>",
-  "market_id": "<id if available>"
+  "rationale": "<one sentence: why is this mispriced and when does it resolve>",
+  "time_horizon": "<e.g. 6h, 12h, 24h, 48h>",
+  "resolves_at": "<date or event>"
 }
 
-Only output opportunities with confidence >= 0.6. Output an array of JSON objects.
-Be concise and data-driven."""
+Only output opportunities where edge >= 0.08 AND confidence >= 0.65. Output a JSON array. Max 3 opportunities."""
 
 
 class ResearchAgent(BaseAgent):
@@ -141,15 +150,14 @@ class ResearchAgent(BaseAgent):
         demo = market_data.get("demo_mode", False)
         note = "\n⚠️ NOTE: No exchange keys configured — using simulated demo data. Set up API keys for real trading.\n" if demo else ""
 
-        user_prompt = f"""Analyze the following market data and identify trading opportunities:{note}
+        user_prompt = f"""Find quick-flip opportunities in this live Polymarket data:{note}
 
-POLYMARKET (prediction markets):
-{json.dumps(market_data.get('polymarket_markets', [])[:10], indent=2, default=str)}
+ACTIVE POLYMARKET MARKETS (sorted by 24h volume):
+{json.dumps(market_data.get('polymarket_markets', [])[:15], indent=2, default=str)}
 
-HYPERLIQUID (perpetuals — top movers/volume):
-{json.dumps(market_data.get('hyperliquid_markets', [])[:10], indent=2, default=str)}
-
-Identify up to 3 high-confidence opportunities. Output a JSON array."""
+Focus ONLY on markets resolving within 72 hours that are mispriced.
+Include the condition_id as market_id in your output.
+Output a JSON array of up to 3 opportunities."""
 
         if not settings.openrouter_api_key:
             logger.info("No OPENROUTER_API_KEY — skipping LLM analysis, returning demo opportunity")

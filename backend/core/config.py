@@ -36,13 +36,13 @@ class Settings(BaseSettings):
     trading_enabled: bool = False
     log_level: str = "INFO"
 
-    # OpenRouter model assignments
+    # OpenRouter model assignments (two working free models rotated across agents)
     model_master: str = "openai/gpt-oss-120b:free"
-    model_research: str = "minimax/minimax-m2.5:free"
-    model_analysis: str = "google/gemma-4-31b-it:free"
+    model_research: str = "nvidia/nemotron-3-super-120b-a12b:free"
+    model_analysis: str = "nvidia/nemotron-3-super-120b-a12b:free"
     model_risk: str = "openai/gpt-oss-120b:free"
-    model_debate: str = "google/gemma-4-26b-a4b-it:free"
-    model_execution: str = "google/gemma-4-26b-a4b-it:free"
+    model_debate: str = "nvidia/nemotron-3-super-120b-a12b:free"
+    model_execution: str = "openai/gpt-oss-120b:free"
 
     @field_validator("telegram_allowed_user_id", mode="before")
     @classmethod

@@ -152,7 +152,10 @@ async def _seed_agents() -> None:
     async with AsyncSessionLocal() as session:
         for name, model in agent_definitions:
             result = await session.execute(select(Agent).where(Agent.name == name))
-            if not result.scalar_one_or_none():
+            existing = result.scalar_one_or_none()
+            if existing:
+                existing.model = model  # keep model name in sync with config
+            else:
                 session.add(Agent(name=name, model=model, status="idle"))
         await session.commit()
 

@@ -13,25 +13,28 @@ from core.message_bus import AgentMessage, MessageBus, MessageType
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = """You are a quantitative trading analyst. You receive trading opportunities and produce a detailed analysis thesis.
+SYSTEM_PROMPT = """You are a Polymarket short-term trading analyst. You evaluate opportunities for quick flips — markets resolving within hours or days.
 
-For each opportunity, provide a JSON object with:
+Produce a JSON thesis:
 {
   "market": "<market name>",
-  "exchange": "<exchange>",
-  "direction": "<direction>",
-  "thesis": "<3-5 sentence analysis>",
-  "supporting_factors": ["<factor1>", "<factor2>", "<factor3>"],
-  "risks": ["<risk1>", "<risk2>"],
+  "exchange": "polymarket",
+  "market_id": "<condition_id>",
+  "direction": "<buy yes or buy no>",
+  "thesis": "<2-3 sentences: why is this mispriced and what is the catalyst for correction>",
+  "edge_reason": "<specific reason the market is wrong right now>",
   "confidence_score": <0.0 to 1.0>,
-  "suggested_entry": <price float>,
-  "suggested_stop_loss": <price float>,
-  "suggested_take_profit": <price float>,
-  "position_size_pct": <recommended % of portfolio 0-10>,
-  "expected_return_pct": <expected return %>
+  "suggested_entry": <current price float>,
+  "suggested_take_profit": <target price, e.g. 0.80 for a YES at 0.65>,
+  "stop_loss": <price where thesis is broken>,
+  "position_size_pct": <% of paper balance to use, 2-8%>,
+  "expected_return_pct": <(take_profit - entry) / entry * 100>,
+  "time_to_resolution": "<hours or days>",
+  "resolves_at": "<event or date>"
 }
 
-Be rigorous. If the opportunity is weak, say so with a low confidence score."""
+Focus on SPEED. Only approve opportunities that can profit within 72 hours.
+If the opportunity looks weak or far-term, set confidence_score below 0.6."""
 
 
 class AnalysisAgent(BaseAgent):
@@ -58,11 +61,17 @@ class AnalysisAgent(BaseAgent):
         logger.info("Analysis agent processing opportunity: %s", market)
 
         try:
-            user_prompt = f"""Analyze this trading opportunity in depth:
+            user_prompt = f"""Analyze this Polymarket opportunity for a quick flip:
 
 {json.dumps(opp, indent=2)}
 
-Provide a comprehensive trade thesis in JSON format."""
+The market_id (condition_id) is: {opp.get('market_id', 'unknown')}
+Current YES price: {opp.get('current_price', '?')}
+Estimated fair value: {opp.get('fair_value', '?')}
+Time horizon: {opp.get('time_horizon', '?')}
+Resolves: {opp.get('resolves_at', '?')}
+
+Output the thesis JSON. Keep market_id exactly as provided."""
 
             response = await self.call_llm(
                 system=SYSTEM_PROMPT,
